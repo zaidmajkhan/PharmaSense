@@ -1,6 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
 import seedData from '@/data/drugs.json';
+import { extractKeywords } from '@/db/context-keywords';
 import type { Drug, UsageType } from '@/types/drug';
 
 const db = SQLite.openDatabaseSync('pharmasense.db');
@@ -115,11 +116,7 @@ export function getDrugOfTheDay(date: Date = new Date()): Drug | null {
  * Used to inject grounding context into Ask AI requests.
  */
 export function findRelevantDrugs(message: string, limit = 8): Drug[] {
-  const words = message
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, ' ')
-    .split(/\s+/)
-    .filter((w) => w.length >= 4);
+  const words = extractKeywords(message);
   if (words.length === 0) return [];
 
   const found = new Map<number, Drug>();

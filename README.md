@@ -1,56 +1,61 @@
-# Welcome to your Expo app 👋
+# PharmaSense
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A drug-reference and OTC-guidance app built with Expo (React Native). All drug
+data is cached locally in SQLite — seeded once from OpenFDA and RxNorm — and the
+app never calls those APIs during normal use.
 
-## Get started
+## Tabs
 
-1. Install dependencies
+- **Home** — deterministic "Drug of the Day", quick stats (flashcards reviewed,
+  AI queries this week), shortcuts, and recently viewed drugs.
+- **Ask AI** — chat with Claude, grounded exclusively in the local drug cache.
+  It explains cached drug info in plain language, or suggests general OTC drug
+  *categories* (never brands or doses) for mild symptoms. Every symptom answer
+  includes a "see a doctor if…" note, and severe symptoms get a
+  doctor/urgent-care recommendation instead of an OTC suggestion.
+- **Search** — search the local cache by name; expandable cards show class,
+  uses, dosing, side effects, interactions, and OTC/prescription status.
+- **Flashcards** — swipeable flip cards (front: name + class; back: uses +
+  side effects) that resume where you left off.
 
-   ```bash
-   npm install
-   ```
+All searches, views, flashcard reviews, and AI queries are logged to a local
+`usage` table that powers the Home-tab stats.
 
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Setup
 
 ```bash
-npm run reset-project
+npm install
+cp .env.example .env   # then set EXPO_PUBLIC_ANTHROPIC_API_KEY
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+The repo ships with a pre-seeded cache (`src/data/drugs.json`, 73 common OTC
+and prescription drugs). To refresh it from OpenFDA/RxNorm:
 
-### Other setup steps
+```bash
+npm run seed
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+The app imports the JSON into the on-device SQLite database on first launch
+(and re-imports whenever the seed file changes).
 
-## Learn more
+## Testing the AI safety boundaries
 
-To learn more about developing your project with Expo, look at the following resources:
+With an API key in `.env`:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```bash
+node scripts/test-ai-boundaries.mjs
+```
 
-## Join the community
+This exercises the live API with the app's exact system prompt and context
+injection, and checks that: drug explanations stay grounded in cached data,
+mild symptoms get OTC categories plus a "see a doctor if…" note, specific
+dose/brand requests are refused, and severe symptoms are redirected to a
+doctor or urgent care.
 
-Join our community of developers creating universal apps.
+## Notes
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- `EXPO_PUBLIC_*` env vars are inlined into the client bundle. That is fine for
+  local development; route Anthropic calls through a backend proxy before any
+  production release.
+- Drug data is informational only and not medical advice.
