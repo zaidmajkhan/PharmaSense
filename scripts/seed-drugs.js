@@ -22,8 +22,12 @@ const MAX_FIELD_LENGTH = 700;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function fetchJson(url) {
+async function fetchJson(url, attempt = 0) {
   const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (res.status === 429 && attempt < 5) {
+    await sleep(1500 * (attempt + 1));
+    return fetchJson(url, attempt + 1);
+  }
   if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
   return res.json();
 }
@@ -52,49 +56,88 @@ function firstField(result, keys) {
   return null;
 }
 
-const SALT_SUFFIXES = ['', ' HYDROCHLORIDE', ' HCL', ' SODIUM', ' SUCCINATE', ' TARTRATE', ' POTASSIUM', ' CITRATE', ' SULFATE', ' MALEATE'];
+const SALT_SUFFIXES = [
+  '',
+  ' HYDROCHLORIDE',
+  ' HCL',
+  ' SODIUM',
+  ' SUCCINATE',
+  ' TARTRATE',
+  ' POTASSIUM',
+  ' CITRATE',
+  ' SULFATE',
+  ' MALEATE',
+  ' PROPIONATE',
+  ' FUMARATE',
+  ' BESYLATE',
+  ' BITARTRATE',
+  ' PHOSPHATE',
+  ' MONOHYDRATE',
+  ' BROMIDE',
+];
+
+const CONTENT_KEYS = ['indications_and_usage', 'purpose', 'dosage_and_administration', 'adverse_reactions', 'warnings'];
+
+function isSingleIngredient(result) {
+  const generics = result.openfda?.generic_name ?? [];
+  if (generics.length !== 1) return false;
+  return !generics[0].includes(',') && !/\band\b/i.test(generics[0]);
+}
+
+function fieldText(value) {
+  if (!value) return '';
+  return (Array.isArray(value) ? value.join(' ') : String(value)).trim();
+}
+
+function hasLabelContent(result) {
+  const total = CONTENT_KEYS.reduce((sum, key) => sum + fieldText(result[key]).length, 0);
+  return total > 40;
+}
+
+/** Prefer a label that actually has uses/dosing text, then single-ingredient, then one with a class. */
+function pickLabel(results) {
+  if (!results?.length) return null;
+  return [...results].sort((a, b) => {
+    const score = (result) =>
+      (hasLabelContent(result) ? 0 : 4) + (isSingleIngredient(result) ? 0 : 2) + (result.openfda?.pharm_class_epc?.length ? 0 : 1);
+    return score(a) - score(b);
+  })[0];
+}
 
 /**
- * Query OpenFDA drug labels. Uses `.exact` matching so we get single-ingredient
- * products (a plain phrase search mostly returns combination products), trying
- * common salt-form suffixes. Falls back to a loose search that prefers
- * single-ingredient results.
+ * Query OpenFDA drug labels. Tries exact generic-name matches, including
+ * common salt forms, then a looser search. Skips labels that have no
+ * usable clinical text when a better label is available.
  */
 async function fetchOpenFdaLabel(name) {
   const upper = name.toUpperCase();
+  let best = null;
 
   for (const suffix of SALT_SUFFIXES) {
     try {
       const search = `openfda.generic_name.exact:"${upper}${suffix}"`;
-      const url = `${OPENFDA_URL}?search=${encodeURIComponent(search)}&limit=5`;
+      const url = `${OPENFDA_URL}?search=${encodeURIComponent(search)}&limit=15`;
       const data = await fetchJson(url);
-      const results = data.results ?? [];
-      // Prefer a result that carries a pharmacologic class; otherwise take the first.
-      const withClass = results.find((r) => r.openfda?.pharm_class_epc?.length);
-      if (results.length > 0) return withClass ?? results[0];
+      const chosen = pickLabel(data.results ?? []);
+      if (chosen && hasLabelContent(chosen)) return chosen;
+      if (chosen && !best) best = chosen;
     } catch (err) {
       if (!String(err.message).includes('404')) throw err;
     }
     await sleep(100);
   }
 
-  // Loose fallback: token search, prefer single-ingredient generic names.
   try {
     const search = `openfda.generic_name:"${name}"`;
     const url = `${OPENFDA_URL}?search=${encodeURIComponent(search)}&limit=10`;
     const data = await fetchJson(url);
-    const results = data.results ?? [];
-    const single = results.filter((r) => {
-      const generics = r.openfda?.generic_name ?? [];
-      return generics.length === 1 && !generics[0].includes(',') && !/\band\b/i.test(generics[0]);
-    });
-    const pool = single.length > 0 ? single : results;
-    const withClass = pool.find((r) => r.openfda?.pharm_class_epc?.length);
-    if (pool.length > 0) return withClass ?? pool[0];
+    const chosen = pickLabel(data.results ?? []);
+    if (chosen && hasLabelContent(chosen)) return chosen;
+    return chosen ?? best;
   } catch (err) {
     if (!String(err.message).includes('404')) throw err;
   }
-  return null;
+  return best;
 }
 
 /** RxNorm: normalize the name and get an RxCUI. */
@@ -145,6 +188,18 @@ function titleCase(name) {
   return name.replace(/\b[a-z]/g, (ch) => ch.toUpperCase());
 }
 
+/** Up to four consumer brand names from the OpenFDA label, for search. */
+function brandNamesFromLabel(label) {
+  const raw = label?.openfda?.brand_name ?? [];
+  const unique = [];
+  for (const brand of raw) {
+    const name = titleCase(String(brand).toLowerCase());
+    if (!unique.includes(name)) unique.push(name);
+    if (unique.length >= 4) break;
+  }
+  return unique.join(', ');
+}
+
 async function buildDrugRecord(entry) {
   const [label, rxnorm] = [await fetchOpenFdaLabel(entry.name), await fetchRxNorm(entry.name)];
 
@@ -183,15 +238,37 @@ async function buildDrugRecord(entry) {
     notable_fact: entry.notableFact,
     otc_or_prescription: entry.otc ? 'otc' : 'prescription',
     rxcui: rxnorm.rxcui,
+    brand_names: label ? brandNamesFromLabel(label) : '',
   };
+}
+
+function loadExistingByName() {
+  if (!fs.existsSync(OUTPUT_PATH)) return new Map();
+  try {
+    const existing = JSON.parse(fs.readFileSync(OUTPUT_PATH, 'utf8'));
+    const map = new Map();
+    for (const drug of existing.drugs ?? []) {
+      if (drug?.name && drug.drug_class && drug.uses) map.set(drug.name.toLowerCase(), drug);
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
 }
 
 async function main() {
   console.log(`Seeding ${DRUG_LIST.length} drugs from OpenFDA + RxNorm...\n`);
+  const existing = loadExistingByName();
   const drugs = [];
   const failures = [];
 
   for (const entry of DRUG_LIST) {
+    const cached = existing.get(entry.name.toLowerCase());
+    if (cached?.rxcui && typeof cached.brand_names === 'string') {
+      drugs.push({ ...cached, notable_fact: entry.notableFact, otc_or_prescription: entry.otc ? 'otc' : 'prescription' });
+      console.log(`  keep  ${cached.name}`);
+      continue;
+    }
     try {
       const record = await buildDrugRecord(entry);
       if (record) {

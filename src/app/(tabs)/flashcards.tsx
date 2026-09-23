@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -19,7 +19,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Colors, Fonts, Spacing } from '@/constants/theme';
-import { getAllDrugs, logUsage } from '@/db/database';
+import { getAllDrugs, getDatabaseInitError, logUsage } from '@/db/database';
 
 const LAST_INDEX_KEY = 'flashcards:lastIndex';
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -31,6 +31,8 @@ export default function FlashcardsScreen() {
 
   const drugs = useMemo(() => getAllDrugs(), []);
   const [index, setIndex] = useState<number | null>(null); // null until restored
+  const indexRef = useRef(0);
+  const loggedIndex = useRef<number | null>(null);
 
   const translateX = useSharedValue(0);
   const flip = useSharedValue(0); // 0 = front, 1 = back
@@ -43,16 +45,29 @@ export default function FlashcardsScreen() {
     });
   }, [drugs.length]);
 
-  // Each displayed card counts as a flashcard review; also persist position.
+  useEffect(() => {
+    if (index !== null) indexRef.current = index;
+  }, [index]);
+
+  // Persist position only. A review is logged when the card is flipped or swiped forward.
   useEffect(() => {
     if (index === null || drugs.length === 0) return;
-    logUsage('flashcard', drugs[index].id);
     AsyncStorage.setItem(LAST_INDEX_KEY, String(index));
-  }, [index, drugs]);
+  }, [index, drugs.length]);
+
+  function recordReviewOnce() {
+    const current = indexRef.current;
+    if (loggedIndex.current === current) return;
+    const drug = drugs[current];
+    if (!drug) return;
+    loggedIndex.current = current;
+    logUsage('flashcard', drug.id);
+  }
 
   function advance(direction: 1 | -1) {
+    if (direction === 1) recordReviewOnce();
     setIndex((prev) => {
-      if (prev === null) return prev;
+      if (prev === null || drugs.length === 0) return prev;
       return (prev + direction + drugs.length) % drugs.length;
     });
     flip.value = 0;
@@ -80,7 +95,9 @@ export default function FlashcardsScreen() {
     });
 
   const tap = Gesture.Tap().onEnd(() => {
-    flip.value = withTiming(flip.value > 0.5 ? 0 : 1, { duration: 350 });
+    const opening = flip.value <= 0.5;
+    flip.value = withTiming(opening ? 1 : 0, { duration: 350 });
+    if (opening) runOnJS(recordReviewOnce)();
   });
 
   const gesture = Gesture.Exclusive(pan, tap);
@@ -106,6 +123,16 @@ export default function FlashcardsScreen() {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
         <ActivityIndicator color={colors.tint} />
+      </View>
+    );
+  }
+
+  if (drugs.length === 0) {
+    return (
+      <View style={[styles.center, { backgroundColor: colors.background, padding: Spacing.four }]}>
+        <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>
+          {getDatabaseInitError() ?? 'No drugs are cached yet. Run the seed script, then reopen the app.'}
+        </Text>
       </View>
     );
   }
@@ -150,6 +177,9 @@ export default function FlashcardsScreen() {
 
       <Text style={[styles.swipeHint, { color: colors.textSecondary }]}>
         Swipe left for next · right for previous
+      </Text>
+      <Text style={[styles.swipeHint, { color: colors.textSecondary }]}>
+        Study aid only — not medical advice.
       </Text>
     </View>
   );

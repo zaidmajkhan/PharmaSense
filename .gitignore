@@ -43,3 +43,7 @@ example
 # generated native folders
 /ios
 /android
+
+# seed scratch
+scripts/.seed-progress.json
+src/data/drugs.json.bak

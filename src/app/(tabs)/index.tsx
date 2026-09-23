@@ -13,6 +13,7 @@ import {
 import { Colors, Fonts, Spacing } from '@/constants/theme';
 import {
   getAiQueriesThisWeek,
+  getDatabaseInitError,
   getDrugOfTheDay,
   getFlashcardsReviewedCount,
   getRecentlyViewedDrugs,
@@ -38,10 +39,15 @@ export default function HomeScreen() {
     }, [])
   );
 
+  const initError = getDatabaseInitError();
+
   return (
     <ScrollView
       style={{ backgroundColor: colors.background }}
       contentContainerStyle={styles.content}>
+      {initError ? (
+        <Text style={{ color: colors.warning, marginBottom: Spacing.three }}>{initError}</Text>
+      ) : null}
       {drugOfTheDay && (
         <Pressable
           onPress={() => router.push(`/drug/${drugOfTheDay.id}`)}
@@ -116,6 +122,10 @@ export default function HomeScreen() {
           ))}
         </ScrollView>
       )}
+
+      <Text style={[styles.disclaimer, { color: colors.textSecondary }]}>
+        Drug facts are cached from OpenFDA and RxNorm. Informational only — not medical advice.
+      </Text>
     </ScrollView>
   );
 }
@@ -201,4 +211,5 @@ const styles = StyleSheet.create({
   },
   recentName: { fontSize: 15, fontWeight: '600' },
   recentClass: { fontSize: 12, marginTop: 2 },
+  disclaimer: { fontSize: 12, lineHeight: 18, marginTop: Spacing.four },
 });

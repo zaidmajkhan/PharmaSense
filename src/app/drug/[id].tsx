@@ -36,6 +36,14 @@ export default function DrugDetailScreen() {
         {drug.name}
       </Text>
       <Text style={[styles.drugClass, { color: colors.textSecondary }]}>{drug.drug_class}</Text>
+      {!!drug.brand_names && (
+        <Text style={[styles.drugClass, { color: colors.textSecondary }]}>
+          Brands: {drug.brand_names}
+        </Text>
+      )}
+      {!!drug.rxcui && (
+        <Text style={[styles.drugClass, { color: colors.textSecondary }]}>RxNorm {drug.rxcui}</Text>
+      )}
 
       <View
         style={[
@@ -49,12 +57,14 @@ export default function DrugDetailScreen() {
 
       <Section title="Notable fact" body={drug.notable_fact} colors={colors} />
       <Section title="Uses" body={drug.uses} colors={colors} />
-      <Section title="Dosing" body={drug.dosing} colors={colors} />
+      <Section title="Label dosing" body={drug.dosing} colors={colors} />
       <Section title="Side effects" body={drug.side_effects} colors={colors} />
       <Section title="Interactions" body={drug.interactions} colors={colors} />
 
       <Text style={[styles.disclaimer, { color: colors.textSecondary }]}>
-        Cached from OpenFDA / RxNorm label data. Informational only — not medical advice.
+        Uses, dosing, side effects, and interactions are copied from OpenFDA drug labels and
+        classified with RxNorm. The dosing section is label text, not a dose for you. Informational
+        only — not medical advice.
       </Text>
     </ScrollView>
   );

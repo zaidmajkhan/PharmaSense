@@ -10,8 +10,9 @@ app never calls those APIs during normal use.
   AI queries this week), shortcuts, and recently viewed drugs.
 - **Ask AI** — chat with Claude, grounded exclusively in the local drug cache.
   It explains cached drug info in plain language, or suggests general OTC drug
-  *categories* (never brands or doses) for mild symptoms. Every symptom answer
-  includes a "see a doctor if…" note, and severe symptoms get a
+  *categories* (never brands, strengths, or doses) for mild symptoms. Dosing
+  text stays on the drug screen and is not sent to the model. Every symptom
+  answer includes a "see a doctor if…" note, and severe symptoms get a
   doctor/urgent-care recommendation instead of an OTC suggestion.
 - **Search** — search the local cache by name; expandable cards show class,
   uses, dosing, side effects, interactions, and OTC/prescription status.
@@ -29,12 +30,15 @@ cp .env.example .env   # then set EXPO_PUBLIC_ANTHROPIC_API_KEY
 npx expo start
 ```
 
-The repo ships with a pre-seeded cache (`src/data/drugs.json`, 73 common OTC
-and prescription drugs). To refresh it from OpenFDA/RxNorm:
+The repo ships with a pre-seeded cache (`src/data/drugs.json`, 200 common OTC
+and prescription drugs). Each record is tied to an RxNorm RxCUI and, when the
+label has them, brand names from OpenFDA. To refresh it from those databases:
 
 ```bash
 npm run seed
 ```
+
+`npm run seed:py` runs the same refresh with Python if Node is not on your PATH.
 
 The app imports the JSON into the on-device SQLite database on first launch
 (and re-imports whenever the seed file changes).
