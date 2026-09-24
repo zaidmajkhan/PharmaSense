@@ -45,7 +45,6 @@
     "start": "expo start",
     "seed": "node ./scripts/seed-drugs.js",
     "seed:py": "py -3 ./scripts/seed_drugs.py",
-    "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",

@@ -39,10 +39,12 @@ export default function FlashcardsScreen() {
 
   // Resume from the last-viewed card.
   useEffect(() => {
-    AsyncStorage.getItem(LAST_INDEX_KEY).then((stored) => {
-      const parsed = stored ? Number(stored) : 0;
-      setIndex(Number.isFinite(parsed) && parsed >= 0 && parsed < drugs.length ? parsed : 0);
-    });
+    AsyncStorage.getItem(LAST_INDEX_KEY)
+      .then((stored) => {
+        const parsed = stored ? Number(stored) : 0;
+        setIndex(Number.isFinite(parsed) && parsed >= 0 && parsed < drugs.length ? parsed : 0);
+      })
+      .catch(() => setIndex(0)); // Never leave the spinner up if storage fails.
   }, [drugs.length]);
 
   useEffect(() => {
@@ -52,7 +54,7 @@ export default function FlashcardsScreen() {
   // Persist position only. A review is logged when the card is flipped or swiped forward.
   useEffect(() => {
     if (index === null || drugs.length === 0) return;
-    AsyncStorage.setItem(LAST_INDEX_KEY, String(index));
+    AsyncStorage.setItem(LAST_INDEX_KEY, String(index)).catch(() => {});
   }, [index, drugs.length]);
 
   function recordReviewOnce() {

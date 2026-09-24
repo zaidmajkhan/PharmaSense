@@ -38,7 +38,6 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-example
 
 # generated native folders
 /ios
@@ -47,3 +46,7 @@ example
 # seed scratch
 scripts/.seed-progress.json
 src/data/drugs.json.bak
+
+# python
+__pycache__/
+*.pyc
