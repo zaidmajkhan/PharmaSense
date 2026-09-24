@@ -11,16 +11,15 @@ const drug: ContextDrug = {
   interactions: 'Aspirin',
 };
 
-function makeDeps(overrides: Partial<AskDeps> = {}): AskDeps & { callModel: jest.Mock } {
-  const callModel = jest.fn(async () => 'grounded reply');
+function makeDeps(overrides: Partial<AskDeps> = {}): AskDeps {
   return {
     apiKey: 'sk-test',
     findDrugsByRxcui: (ids) => (ids.includes('5640') ? [drug] : []),
-    callModel,
+    callModel: jest.fn(async () => 'grounded reply'),
     limiter: new RateLimiter(),
     now: 1_000_000,
     ...overrides,
-  } as AskDeps & { callModel: jest.Mock };
+  };
 }
 
 const userMessage = (content = 'What is ibuprofen for?'): ChatMessage => ({ role: 'user', content });
@@ -45,7 +44,7 @@ describe('validateAskBody', () => {
     ['too many messages', { messages: Array.from({ length: LIMITS.maxMessages + 1 }, () => userMessage()) }],
     ['non-numeric rxcui', { messages: [userMessage()], rxcuis: ['abc'] }],
     ['too many rxcuis', { messages: [userMessage()], rxcuis: Array.from({ length: LIMITS.maxRxcuis + 1 }, () => '1') }],
-  ])('rejects %s', (_label, body) => {
+  ])('rejects %s', (_label: string, body: unknown) => {
     expect(typeof validateAskBody(body)).toBe('string');
   });
 });
@@ -97,7 +96,11 @@ describe('handleAsk', () => {
   });
 
   it('hides upstream error details behind a 502', async () => {
-    const deps = makeDeps({ callModel: jest.fn(async () => { throw new Error('Anthropic API error 500: secret detail'); }) });
+    const deps = makeDeps({
+      callModel: jest.fn(async () => {
+        throw new Error('Anthropic API error 500: secret detail');
+      }),
+    });
     const result = await handleAsk({ messages: [userMessage()] }, { installId: INSTALL, ip: null }, deps);
     expect(result.status).toBe(502);
     expect(JSON.stringify(result.body)).not.toContain('secret detail');

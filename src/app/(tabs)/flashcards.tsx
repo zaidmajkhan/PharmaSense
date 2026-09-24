@@ -74,6 +74,9 @@ export default function FlashcardsScreen() {
     translateX.value = 0;
   }
 
+  // Gesture callbacks run on the UI thread and call into JS via runOnJS.
+  // React Compiler's ref lint treats that as reading refs during render.
+  /* eslint-disable react-hooks/refs */
   const pan = Gesture.Pan()
     .onUpdate((e) => {
       translateX.value = e.translationX;
@@ -101,6 +104,7 @@ export default function FlashcardsScreen() {
   });
 
   const gesture = Gesture.Exclusive(pan, tap);
+  /* eslint-enable react-hooks/refs */
 
   const cardStyle = useAnimatedStyle(() => ({
     transform: [
