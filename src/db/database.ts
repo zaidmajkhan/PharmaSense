@@ -71,7 +71,12 @@ function initDatabaseTables(): void {
 
   if (seededVersion !== seedData.generatedAt) {
     db.withTransactionSync(() => {
-      db.runSync(`DELETE FROM usage`);
+      // Keep the user's history across seed refreshes: remember each old id's
+      // name, re-import, then point usage rows at the new id for that name.
+      db.execSync(`
+        DROP TABLE IF EXISTS temp.old_drug_ids;
+        CREATE TEMP TABLE old_drug_ids AS SELECT id, name FROM drugs;
+      `);
       db.runSync(`DELETE FROM drugs`);
       const insert = db.prepareSync(
         `INSERT INTO drugs (name, drug_class, uses, dosing, side_effects, interactions, notable_fact, otc_or_prescription, rxcui, brand_names)
@@ -95,6 +100,15 @@ function initDatabaseTables(): void {
       } finally {
         insert.finalizeSync();
       }
+      // Drugs dropped from the seed keep their usage rows (stats stay) with no drug link.
+      db.execSync(`
+        UPDATE usage SET drug_id = (
+          SELECT d.id FROM drugs d JOIN old_drug_ids o ON o.name = d.name
+          WHERE o.id = usage.drug_id
+        )
+        WHERE drug_id IS NOT NULL;
+        DROP TABLE old_drug_ids;
+      `);
       db.runSync(
         `INSERT OR REPLACE INTO meta (key, value) VALUES ('seed_version', ?)`,
         [seedData.generatedAt]

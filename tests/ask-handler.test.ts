@@ -106,3 +106,22 @@ describe('handleAsk', () => {
     expect(JSON.stringify(result.body)).not.toContain('secret detail');
   });
 });
+
+describe('RateLimiter', () => {
+  const HOUR = 60 * 60 * 1000;
+
+  it('frees the slot once a hit leaves the one-hour window', () => {
+    const limiter = new RateLimiter();
+    expect(limiter.allow('k', 1, 0)).toBe(true);
+    expect(limiter.allow('k', 1, HOUR - 1)).toBe(false);
+    expect(limiter.allow('k', 1, HOUR + 1)).toBe(true);
+  });
+
+  it('forgets idle keys so memory does not grow with every install id', () => {
+    const limiter = new RateLimiter();
+    for (let i = 0; i < 100; i++) limiter.allow(`install:${i}`, 5, 0);
+    expect(limiter.size).toBe(100);
+    limiter.allow('install:new', 5, HOUR + 60 * 1000);
+    expect(limiter.size).toBe(1);
+  });
+});

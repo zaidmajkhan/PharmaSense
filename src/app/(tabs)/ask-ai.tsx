@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 
 import { AskError, askPharmaSense } from '@/ai/client';
+import { mergeByRecency } from '@/ai/context';
 import type { ChatMessage } from '@/ai/prompt';
 import { Colors, Spacing } from '@/constants/theme';
 import { findRelevantDrugs, logUsage } from '@/db/database';
@@ -31,6 +32,9 @@ interface Bubble extends ChatMessage {
 const THREAD_KEY = 'askai:thread';
 const MAX_SAVED = 50;
 const MAX_HISTORY_SENT = 20;
+/** Earlier user turns scanned for drug context, and the server's rxcui cap. */
+const CONTEXT_TURNS = 3;
+const MAX_CONTEXT_DRUGS = 8;
 
 const WELCOME: Bubble = {
   id: 'welcome',
@@ -98,8 +102,19 @@ export default function AskAiScreen() {
     setSending(true);
 
     // Ground the model in the local cache; the server re-reads these drugs by RxNorm id.
-    const contextDrugs = findRelevantDrugs(text);
-    const mentioned = contextDrugs.find((d) => text.toLowerCase().includes(d.name.toLowerCase()));
+    // Earlier user turns are matched too so follow-ups keep the drug under discussion.
+    const currentDrugs = findRelevantDrugs(text);
+    const earlierTurns = base
+      .filter((m) => m.role === 'user')
+      .slice(0, -1) // base always ends with the current question
+      .slice(-CONTEXT_TURNS)
+      .reverse();
+    const contextDrugs = mergeByRecency(
+      [currentDrugs, ...earlierTurns.map((m) => findRelevantDrugs(m.content))],
+      (d) => d.id,
+      MAX_CONTEXT_DRUGS
+    );
+    const mentioned = currentDrugs.find((d) => text.toLowerCase().includes(d.name.toLowerCase()));
     logUsage('ai_query', mentioned?.id ?? null);
 
     try {

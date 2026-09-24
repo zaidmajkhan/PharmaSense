@@ -64,9 +64,11 @@ export function validateAskBody(raw: unknown): AskBody | string {
  */
 export class RateLimiter {
   private hits = new Map<string, number[]>();
+  private lastSweep = 0;
 
   allow(key: string, limit: number, now: number = Date.now()): boolean {
     const windowStart = now - 60 * 60 * 1000;
+    this.sweep(windowStart, now);
     const recent = (this.hits.get(key) ?? []).filter((t) => t > windowStart);
     if (recent.length >= limit) {
       this.hits.set(key, recent);
@@ -75,6 +77,20 @@ export class RateLimiter {
     recent.push(now);
     this.hits.set(key, recent);
     return true;
+  }
+
+  /** Number of keys currently tracked. */
+  get size(): number {
+    return this.hits.size;
+  }
+
+  /** Drops keys with no hits in the window, at most once a minute, so idle keys don't pile up. */
+  private sweep(windowStart: number, now: number): void {
+    if (now - this.lastSweep < 60 * 1000) return;
+    this.lastSweep = now;
+    for (const [key, times] of this.hits) {
+      if (times[times.length - 1] <= windowStart) this.hits.delete(key);
+    }
   }
 }
 

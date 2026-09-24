@@ -2,6 +2,8 @@ import { SYSTEM_PROMPT, buildContextBlock, type ChatMessage, type ContextDrug } 
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const DEFAULT_MODEL = 'claude-sonnet-5';
+/** Below the client's 30s timeout, so the app gets a clean error instead of a dropped request. */
+const UPSTREAM_TIMEOUT_MS = 25_000;
 
 export class UpstreamError extends Error {
   readonly status: number;
@@ -36,6 +38,7 @@ export async function callAnthropic(
       system: `${SYSTEM_PROMPT}\n\n${buildContextBlock(contextDrugs)}`,
       messages: history,
     }),
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
   });
 
   if (!response.ok) {
