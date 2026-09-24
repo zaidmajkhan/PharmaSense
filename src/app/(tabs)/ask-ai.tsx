@@ -1,7 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from 'expo-router';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -13,75 +16,132 @@ import {
   useColorScheme,
 } from 'react-native';
 
-import { askClaude, type ChatMessage } from '@/ai/claude';
+import { AskError, askPharmaSense } from '@/ai/client';
+import type { ChatMessage } from '@/ai/prompt';
 import { Colors, Spacing } from '@/constants/theme';
 import { findRelevantDrugs, logUsage } from '@/db/database';
 
 interface Bubble extends ChatMessage {
   id: string;
   error?: boolean;
+  /** For error bubbles: the user message to resend on Retry. */
+  retryText?: string;
 }
 
-const WELCOME =
-  'Hi! I can explain any drug in your local PharmaSense cache in plain language, or suggest general OTC categories for mild symptoms. I never recommend specific brands or doses, and I\u2019m not a substitute for a doctor.';
+const THREAD_KEY = 'askai:thread';
+const MAX_SAVED = 50;
+const MAX_HISTORY_SENT = 20;
+
+const WELCOME: Bubble = {
+  id: 'welcome',
+  role: 'assistant',
+  content:
+    'Hi! I can explain any drug in your local PharmaSense cache in plain language, or suggest general OTC categories for mild symptoms. I never recommend specific brands or doses, and I\u2019m not a substitute for a doctor.',
+};
 
 export default function AskAiScreen() {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
+  const navigation = useNavigation();
 
-  const [messages, setMessages] = useState<Bubble[]>([
-    { id: 'welcome', role: 'assistant', content: WELCOME },
-  ]);
+  const [messages, setMessages] = useState<Bubble[]>([WELCOME]);
+  const [restored, setRestored] = useState(false);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const listRef = useRef<FlatList<Bubble>>(null);
 
-  const apiKey = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY;
+  useEffect(() => {
+    AsyncStorage.getItem(THREAD_KEY)
+      .then((stored) => {
+        const saved = stored ? (JSON.parse(stored) as Bubble[]) : [];
+        if (Array.isArray(saved) && saved.length > 0) setMessages([WELCOME, ...saved]);
+      })
+      .catch(() => {})
+      .finally(() => setRestored(true));
+  }, []);
 
-  async function handleSend() {
-    const text = input.trim();
-    if (!text || sending) return;
-    setInput('');
+  useEffect(() => {
+    if (!restored) return;
+    const toSave = messages.filter((m) => m.id !== 'welcome').slice(-MAX_SAVED);
+    AsyncStorage.setItem(THREAD_KEY, JSON.stringify(toSave)).catch(() => {});
+  }, [messages, restored]);
 
-    const userBubble: Bubble = { id: `u-${Date.now()}`, role: 'user', content: text };
-    setMessages((prev) => [...prev, userBubble]);
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable
+          onPress={confirmClear}
+          hitSlop={10}
+          accessibilityLabel="Clear chat"
+          style={{ marginRight: Spacing.three }}>
+          <Ionicons name="trash-outline" size={20} color={colors.tint} />
+        </Pressable>
+      ),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigation, colors.tint, messages.length]);
+
+  function confirmClear() {
+    if (messages.length <= 1) return;
+    const clear = () => setMessages([WELCOME]);
+    if (Platform.OS === 'web') {
+      clear();
+      return;
+    }
+    Alert.alert('Clear chat?', 'This removes the conversation from this device.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Clear', style: 'destructive', onPress: clear },
+    ]);
+  }
+
+  async function send(text: string, base: Bubble[]) {
     setSending(true);
 
-    // Ground the model in the local cache: find drugs whose name, class, or
-    // uses text match the message and inject them as context.
+    // Ground the model in the local cache; the server re-reads these drugs by RxNorm id.
     const contextDrugs = findRelevantDrugs(text);
-
-    // Log the interaction; attach a drug_id when the message names a cached drug.
     const mentioned = contextDrugs.find((d) => text.toLowerCase().includes(d.name.toLowerCase()));
     logUsage('ai_query', mentioned?.id ?? null);
 
     try {
-      if (!apiKey) {
-        throw new Error(
-          'No API key configured. Copy .env.example to .env, set EXPO_PUBLIC_ANTHROPIC_API_KEY, and restart the dev server.'
-        );
-      }
-      const history: ChatMessage[] = [...messages, userBubble]
+      const history: ChatMessage[] = base
         .filter((m) => m.id !== 'welcome' && !m.error)
-        .map(({ role, content }) => ({ role, content }));
-      const reply = await askClaude(history, contextDrugs, apiKey);
-      setMessages((prev) => [
-        ...prev,
-        { id: `a-${Date.now()}`, role: 'assistant', content: reply },
-      ]);
+        .map(({ role, content }) => ({ role, content }))
+        .slice(-MAX_HISTORY_SENT);
+      while (history.length > 0 && history[0].role !== 'user') history.shift();
+      const rxcuis = contextDrugs.map((d) => d.rxcui).filter((id): id is string => !!id);
+      const reply = await askPharmaSense(history, rxcuis);
+      setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: 'assistant', content: reply }]);
     } catch (err) {
       setMessages((prev) => [
         ...prev,
         {
           id: `e-${Date.now()}`,
           role: 'assistant',
-          content: err instanceof Error ? err.message : 'Something went wrong. Please try again.',
+          content: err instanceof AskError ? err.message : 'Something went wrong. Please try again.',
           error: true,
+          retryText: text,
         },
       ]);
     } finally {
       setSending(false);
     }
+  }
+
+  function handleSend() {
+    const text = input.trim();
+    if (!text || sending) return;
+    setInput('');
+    const userBubble: Bubble = { id: `u-${Date.now()}`, role: 'user', content: text };
+    const next = [...messages, userBubble];
+    setMessages(next);
+    send(text, next);
+  }
+
+  function handleRetry(errorBubble: Bubble) {
+    if (sending || !errorBubble.retryText) return;
+    const next = messages.filter((m) => m.id !== errorBubble.id);
+    setMessages(next);
+    send(errorBubble.retryText, next);
   }
 
   return (
@@ -114,6 +174,15 @@ export default function AskAiScreen() {
               }}>
               {item.content}
             </Text>
+            {item.error && item.retryText && (
+              <Pressable
+                onPress={() => handleRetry(item)}
+                disabled={sending}
+                style={({ pressed }) => [styles.retry, { opacity: pressed || sending ? 0.6 : 1 }]}>
+                <Ionicons name="refresh" size={14} color={colors.tint} />
+                <Text style={[styles.retryText, { color: colors.tint }]}>Retry</Text>
+              </Pressable>
+            )}
           </View>
         )}
         ListFooterComponent={
@@ -126,7 +195,7 @@ export default function AskAiScreen() {
       />
 
       <Text style={[styles.disclaimer, { color: colors.textSecondary }]}>
-        General information only — not medical advice.
+        General information only — not medical advice. Messages are sent to our server to answer.
       </Text>
 
       <View style={[styles.inputRow, { borderTopColor: colors.border }]}>
@@ -141,6 +210,7 @@ export default function AskAiScreen() {
           onChangeText={setInput}
           onSubmitEditing={handleSend}
           returnKeyType="send"
+          maxLength={2000}
           multiline
         />
         <Pressable
@@ -171,7 +241,9 @@ const styles = StyleSheet.create({
   },
   userBubble: { alignSelf: 'flex-end', borderBottomRightRadius: 4 },
   assistantBubble: { alignSelf: 'flex-start', borderBottomLeftRadius: 4 },
-  disclaimer: { fontSize: 11, textAlign: 'center', paddingBottom: Spacing.one },
+  retry: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: Spacing.two },
+  retryText: { fontSize: 14, fontWeight: '600' },
+  disclaimer: { fontSize: 11, textAlign: 'center', paddingBottom: Spacing.one, paddingHorizontal: Spacing.three },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',

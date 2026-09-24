@@ -126,6 +126,10 @@ export default function HomeScreen() {
       <Text style={[styles.disclaimer, { color: colors.textSecondary }]}>
         Drug facts are cached from OpenFDA and RxNorm. Informational only — not medical advice.
       </Text>
+      <Pressable onPress={() => router.push('/about')} style={styles.aboutLink}>
+        <Ionicons name="shield-checkmark-outline" size={16} color={colors.tint} />
+        <Text style={[styles.aboutText, { color: colors.tint }]}>About and safety</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -212,4 +216,6 @@ const styles = StyleSheet.create({
   recentName: { fontSize: 15, fontWeight: '600' },
   recentClass: { fontSize: 12, marginTop: 2 },
   disclaimer: { fontSize: 12, lineHeight: 18, marginTop: Spacing.four },
+  aboutLink: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one, marginTop: Spacing.two },
+  aboutText: { fontSize: 14, fontWeight: '600' },
 });

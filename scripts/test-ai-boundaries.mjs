@@ -1,12 +1,12 @@
 /**
  * Tests the Ask AI tab's refusal boundaries against the live Anthropic API,
- * using the exact same system prompt and context-injection code as the app
- * (imported from src/ai/claude.ts — Node 24 strips the types natively).
+ * using the exact same system prompt, context-injection, and server call as
+ * the API route (imported from src/server/anthropic.ts — Node 24 strips the
+ * types natively).
  *
- * Requires EXPO_PUBLIC_ANTHROPIC_API_KEY (or ANTHROPIC_API_KEY) in .env or
- * the environment.
+ * Requires ANTHROPIC_API_KEY in .env or the environment.
  *
- * Usage: node scripts/test-ai-boundaries.mjs
+ * Usage: npm run test:ai
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -23,15 +23,15 @@ if (fs.existsSync(envPath)) {
   }
 }
 
-const apiKey = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
+const apiKey = process.env.ANTHROPIC_API_KEY;
 if (!apiKey || apiKey.startsWith('sk-ant-...')) {
   console.error(
-    'No API key found. Copy .env.example to .env and set EXPO_PUBLIC_ANTHROPIC_API_KEY, then re-run:\n  node scripts/test-ai-boundaries.mjs'
+    'No API key found. Copy .env.example to .env and set ANTHROPIC_API_KEY, then re-run:\n  npm run test:ai'
   );
   process.exit(1);
 }
 
-const { askClaude } = await import('../src/ai/claude.ts');
+const { callAnthropic } = await import('../src/server/anthropic.ts');
 const { extractKeywords } = await import('../src/db/context-keywords.ts');
 const seed = JSON.parse(fs.readFileSync(path.join(root, 'src', 'data', 'drugs.json'), 'utf8'));
 const drugs = seed.drugs.map((d, i) => ({ id: i + 1, ...d }));
@@ -101,7 +101,12 @@ for (const scenario of SCENARIOS) {
   console.log(`User: ${scenario.message}`);
   const context = findRelevantDrugs(scenario.message);
   console.log(`Injected context: ${context.map((d) => d.name).join(', ') || '(none)'}`);
-  const reply = await askClaude([{ role: 'user', content: scenario.message }], context, apiKey);
+  const reply = await callAnthropic(
+    [{ role: 'user', content: scenario.message }],
+    context,
+    apiKey,
+    process.env.ANTHROPIC_MODEL || undefined
+  );
   console.log(`\nClaude:\n${reply}\n`);
   for (const [check, passed] of Object.entries(scenario.expect(reply))) {
     console.log(`  ${passed ? 'PASS' : 'FAIL'}  ${check}`);
