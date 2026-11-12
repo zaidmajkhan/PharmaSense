@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
-import { useColorScheme } from 'react-native';
+import { Platform, Pressable, StyleSheet, View, useColorScheme } from 'react-native';
 
 import { Colors } from '@/constants/theme';
 
@@ -14,10 +14,11 @@ export default function TabLayout() {
         tabBarActiveTintColor: colors.tint,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: {
-          backgroundColor: colors.background,
+          backgroundColor: colors.backgroundElement,
           borderTopColor: colors.border,
-          height: 64,
-          paddingTop: 4,
+          height: Platform.OS === 'ios' ? 84 : 68,
+          paddingTop: 6,
+          paddingBottom: Platform.OS === 'ios' ? 22 : 8,
         },
         tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
         headerStyle: { backgroundColor: colors.background },
@@ -46,7 +47,31 @@ export default function TabLayout() {
         options={{
           title: 'Scan',
           tabBarAccessibilityLabel: 'Scan a label',
-          tabBarIcon: ({ color, size }) => <Ionicons name="camera" size={size + 2} color={color} />,
+          tabBarLabel: () => null,
+          tabBarIcon: () => null,
+          tabBarButton: (props) => {
+            const focused = Boolean(props.accessibilityState?.selected);
+            return (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Scan a label"
+                onPress={props.onPress}
+                onLongPress={props.onLongPress}
+                style={styles.scanWrap}>
+                <View
+                  style={[
+                    styles.scanFab,
+                    {
+                      backgroundColor: colors.tint,
+                      borderColor: colors.backgroundElement,
+                      transform: [{ scale: focused ? 1.04 : 1 }],
+                    },
+                  ]}>
+                  <Ionicons name="camera" size={28} color="#FFFFFF" />
+                </View>
+              </Pressable>
+            );
+          },
         }}
       />
       <Tabs.Screen
@@ -68,3 +93,20 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  scanWrap: {
+    top: -18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flex: 1,
+  },
+  scanFab: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 4,
+  },
+});

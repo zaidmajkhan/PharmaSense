@@ -57,6 +57,10 @@ export default function HomeScreen() {
       ) : null}
 
       <View style={[styles.hero, { backgroundColor: colors.hero, borderColor: colors.border }]}>
+        <View
+          pointerEvents="none"
+          style={[styles.heroGlow, { backgroundColor: colors.heroAccent }]}
+        />
         <Text style={[styles.brand, { color: colors.tint, fontFamily: Fonts?.rounded }]}>
           PharmaSense
         </Text>
@@ -88,10 +92,16 @@ export default function HomeScreen() {
           accessibilityLabel={`My medications, ${medCount} saved`}
           style={({ pressed }) => [
             styles.summaryCard,
-            { backgroundColor: colors.backgroundElement, opacity: pressed ? 0.9 : 1 },
+            {
+              backgroundColor: colors.backgroundElement,
+              borderColor: colors.border,
+              opacity: pressed ? 0.9 : 1,
+            },
           ]}>
           <View style={styles.summaryHeader}>
-            <Ionicons name="medkit-outline" size={22} color={colors.tint} />
+            <View style={[styles.iconChip, { backgroundColor: colors.tintSoft }]}>
+              <Ionicons name="medkit-outline" size={20} color={colors.tint} />
+            </View>
             <Text style={[styles.summaryTitle, { color: colors.text }]}>My medications</Text>
           </View>
           <Text style={[styles.summaryValue, { color: colors.text }]}>{medCount}</Text>
@@ -103,10 +113,15 @@ export default function HomeScreen() {
         </Pressable>
 
         <View
-          style={[styles.summaryCard, { backgroundColor: colors.backgroundElement }]}
+          style={[
+            styles.summaryCard,
+            { backgroundColor: colors.backgroundElement, borderColor: colors.border },
+          ]}
           accessibilityLabel="Sodium watch summary">
           <View style={styles.summaryHeader}>
-            <Ionicons name="water-outline" size={22} color={colors.tint} />
+            <View style={[styles.iconChip, { backgroundColor: colors.tintSoft }]}>
+              <Ionicons name="water-outline" size={20} color={colors.tint} />
+            </View>
             <Text style={[styles.summaryTitle, { color: colors.text }]}>Sodium watch</Text>
           </View>
           <SodiumProgressBars sodiumMg={sodiumToday} colors={colors} compact />
@@ -120,7 +135,11 @@ export default function HomeScreen() {
           accessibilityLabel={`Drug of the day, ${drugOfTheDay.name}`}
           style={({ pressed }) => [
             styles.dotdCard,
-            { backgroundColor: colors.tintSoft, opacity: pressed ? 0.9 : 1 },
+            {
+              backgroundColor: colors.backgroundElement,
+              borderColor: colors.border,
+              opacity: pressed ? 0.9 : 1,
+            },
           ]}>
           <Text style={[styles.dotdLabel, { color: colors.tint }]}>DRUG OF THE DAY</Text>
           <Text style={[styles.dotdName, { color: colors.text, fontFamily: Fonts?.rounded }]}>
@@ -149,7 +168,11 @@ export default function HomeScreen() {
               accessibilityLabel={`${drug.name}, ${drug.drug_class}`}
               style={({ pressed }) => [
                 styles.recentCard,
-                { backgroundColor: colors.backgroundElement, opacity: pressed ? 0.9 : 1 },
+                {
+                  backgroundColor: colors.backgroundElement,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.9 : 1,
+                },
               ]}>
               <Text style={[styles.recentName, { color: colors.text }]} numberOfLines={1}>
                 {drug.name}
@@ -183,18 +206,28 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   content: { padding: Spacing.three, paddingBottom: Spacing.six },
   hero: {
-    borderRadius: 24,
+    borderRadius: 28,
     borderWidth: 1,
     padding: Spacing.four,
     gap: Spacing.two,
+    overflow: 'hidden',
   },
-  brand: { fontSize: 15, fontWeight: '700', letterSpacing: 0.4 },
-  heroTitle: { fontSize: 28, fontWeight: '700', lineHeight: 34 },
+  heroGlow: {
+    position: 'absolute',
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    top: -70,
+    right: -50,
+    opacity: 0.7,
+  },
+  brand: { fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },
+  heroTitle: { fontSize: 30, fontWeight: '700', lineHeight: 36 },
   heroBody: { fontSize: 16, lineHeight: 24 },
   scanButton: {
     marginTop: Spacing.two,
-    minHeight: 56,
-    borderRadius: 16,
+    minHeight: 58,
+    borderRadius: 18,
     paddingHorizontal: Spacing.four,
     flexDirection: 'row',
     alignItems: 'center',
@@ -203,12 +236,29 @@ const styles = StyleSheet.create({
   },
   scanButtonText: { color: '#fff', fontSize: 18, fontWeight: '700' },
   summaryRow: { gap: Spacing.three, marginTop: Spacing.three },
-  summaryCard: { borderRadius: 20, padding: Spacing.three, gap: Spacing.two },
+  summaryCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: Spacing.three,
+    gap: Spacing.two,
+  },
   summaryHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  iconChip: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   summaryTitle: { fontSize: 17, fontWeight: '700' },
   summaryValue: { fontSize: 36, fontWeight: '700', lineHeight: 40 },
   summaryHint: { fontSize: 15, lineHeight: 22 },
-  dotdCard: { borderRadius: 20, padding: Spacing.four, marginTop: Spacing.three },
+  dotdCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: Spacing.four,
+    marginTop: Spacing.three,
+  },
   dotdLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 1.2 },
   dotdName: { fontSize: 26, fontWeight: '700', marginTop: Spacing.one },
   dotdClass: { fontSize: 16, marginTop: 2 },
@@ -223,10 +273,11 @@ const styles = StyleSheet.create({
   emptyRecent: { fontSize: 16, lineHeight: 24 },
   recentCard: {
     width: 150,
-    borderRadius: 16,
+    borderRadius: 18,
+    borderWidth: 1,
     padding: Spacing.three,
     marginRight: Spacing.two,
-    minHeight: 88,
+    minHeight: 92,
   },
   recentName: { fontSize: 16, fontWeight: '600' },
   recentClass: { fontSize: 14, marginTop: 4, lineHeight: 20 },
