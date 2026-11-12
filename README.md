@@ -1,182 +1,201 @@
 # PharmaSense
 
-A hypertension-focused drug-reference and label-scan prototype built with Expo
-(React Native). Drug data is cached locally in SQLite — seeded once from OpenFDA
-and RxNorm — and the app never calls those APIs during normal use.
+**Hypertension-focused medication + nutrition label-scan prototype**  
+Built with Expo (React Native) + TypeScript. Runs as a **phone app** and as a **browser demo**.
 
-**Not medical advice. Prototype only.** Check with your pharmacist or doctor
-before changing medications, diet, or treatment. Blood-pressure flags are a
-small curated list for education demos and must be reviewed by a licensed
-pharmacist before any real use.
+Drug facts are cached locally in SQLite (seeded from OpenFDA and RxNorm). The app does not call those APIs during normal use.
 
-## Tabs
+> **Not medical advice. Prototype only.**  
+> Check with a pharmacist or doctor before changing medications, diet, or treatment. Blood-pressure flags are a small curated list for education demos and must be reviewed by a licensed pharmacist before any real use.
 
-- **Home** — hypertension dashboard with a prominent **Scan a label** button,
-  **My medications** and **Sodium watch** summaries, Drug of the Day, and
-  recently viewed drugs.
-- **Ask AI** — chat with Claude, grounded exclusively in the local drug cache.
-  It explains cached drug info in plain language, or suggests general OTC drug
-  *categories* (never brands, strengths, or doses) for mild symptoms. Dosing
-  text stays on the drug screen and is not sent to the model. Every symptom
-  answer includes a "see a doctor if…" note, and severe symptoms get a
-  doctor/urgent-care recommendation instead of an OTC suggestion. The thread
-  is saved on the device and can be cleared from the header.
-- **Scan** — camera capture (or photo library fallback) of medication and
-  nutrition labels. Images are sent to the Expo API route
-  `src/app/api/scan+api.ts` for vision extraction. Photos are **not saved** on
-  the device or server; they are processed in memory and discarded after the
-  response. The scan screen reminds you: avoid including your name or address
-  in the frame.
-- **Search** — search the local cache by name, class, or brand; results open
-  the full drug screen (with **Add to My medications**).
-- **Flashcards** — swipeable flip cards (front: name + class; back: uses +
-  side effects) that resume where you left off.
+---
 
-Related stack screens: **Scan result**, **My medications**, About/safety, and
-Privacy.
+## Quick start (website demo — easiest way to show it)
 
-## How Ask AI reaches Claude
-
-The app never holds an Anthropic key. Ask AI posts to the Expo API route
-`src/app/api/ask+api.ts`, which:
-
-- validates the request (at most 20 messages of 2,000 characters, at most 8
-  RxNorm ids),
-- rate-limits per install id and per IP (per server worker, so treat it as a
-  first layer),
-- looks up drug context by RxNorm id from its own copy of `drugs.json`, so a
-  modified client cannot inject made-up "cached" drug text,
-- calls Anthropic with the server-side `ANTHROPIC_API_KEY`.
-
-## How label scan works
-
-Scan posts base64 image data to `src/app/api/scan+api.ts`, which:
-
-- validates mime type and payload size,
-- rate-limits per install id and per IP,
-- calls Claude with vision using the same server-side `ANTHROPIC_API_KEY`,
-- returns structured JSON only (`labelType`, medication fields, nutrition /
-  sodium fields, `confidence`, `rawText`, `reason`),
-- does **not** log image data or `rawText`.
-
-Medication results are matched against the on-device SQLite drug cache. Curated
-blood-pressure relevance flags come from `src/data/bp-flags.json` only — never
-from freeform model text. Nutrition results compare sodium per serving to
-2,300 mg (common daily limit) and 1,500 mg (ideal limit) references; you can
-log items into a local daily sodium total that resets by calendar date.
-
-## Privacy
-
-- No accounts and no cloud sync for medications or sodium logs.
-- Scan images are not stored; process in memory only.
-- Prescription labels can contain a patient’s name and address — keep those out
-  of the frame when possible.
-- No analytics or tracking SDKs.
-
-## Website demo (no phone required)
-
-PharmaSense runs in the browser for demos and lab presentations:
+No phone or Apple/Android build required.
 
 ```bash
+git clone https://github.com/zaidmajkhan/PharmaSense.git
+cd PharmaSense
 npm install
-cp .env.example .env   # then set ANTHROPIC_API_KEY
+cp .env.example .env
+```
+
+Edit `.env` and set:
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+Then:
+
+```bash
 npm run demo:web
 ```
 
-Open the local URL Expo prints (usually `http://localhost:8081`). On a laptop
-the site shows a phone-framed demo; on a narrow window it is full-width. Use
-**Scan → Upload label photo** on web (camera is for native builds).
+Open the URL Expo prints (usually `http://localhost:8081`).
 
-To publish a shareable link (after `eas login` and project setup):
+- On a **laptop**, the site shows a phone-framed demo.
+- On a **narrow window / phone browser**, it is full width.
+- On web, use **Scan → Upload label photo** (camera is for native builds).
+
+### Share a public link
 
 ```bash
+npm install -g eas-cli
+eas login
+eas env:create --name ANTHROPIC_API_KEY --environment production --visibility secret
 npm run deploy:server
 ```
 
-That exports the web app and deploys it with EAS Hosting (same path as Ask AI /
-Scan API hosting). Set `ANTHROPIC_API_KEY` in EAS env for the deployed demo.
+That exports the web app and deploys it with EAS Hosting (same host serves Ask AI + Scan APIs).
 
-## Setup
+---
+
+## What it does
+
+| Feature | What you can demo |
+| --- | --- |
+| **Home** | Hypertension dashboard: Scan CTA, My medications, Sodium watch, Drug of the Day, recent drugs |
+| **Scan** | Medication + nutrition labels via camera (native) or photo upload (web) |
+| **BP flags** | Curated warnings (e.g. decongestants, NSAIDs) from `src/data/bp-flags.json` — never freeform AI |
+| **Sodium watch** | Sodium vs 2,300 mg / 1,500 mg references; log items for today (local only) |
+| **My medications** | Local list from scans or Search; remove anytime; no accounts |
+| **Ask AI** | Claude grounded in the local drug cache (no invented doses/brands) |
+| **Search** | Name / class / brand search of 200 cached drugs |
+| **Flashcards** | Study cards for the local cache |
+
+Related screens: Scan result, My medications, About/safety, Privacy.
+
+---
+
+## Privacy (short version)
+
+- No accounts and no cloud sync for meds or sodium logs.
+- Scan images are **not saved** — processed in memory, then discarded.
+- Keep patient name/address out of the camera frame when possible.
+- No analytics or tracking SDKs.
+- API keys stay on the server (`.env` / EAS secrets), never in the client bundle.
+
+Full policy: in-app `/privacy` route.
+
+---
+
+## How Ask AI works
+
+The app never holds an Anthropic key. Ask AI posts to `src/app/api/ask+api.ts`, which:
+
+1. Validates the request (message limits + RxNorm ids)
+2. Rate-limits per install id and per IP
+3. Looks up drug context from the server copy of `drugs.json`
+4. Calls Anthropic with `ANTHROPIC_API_KEY`
+
+Safety behavior: no doses/brands from the model, “see a doctor if…” notes, severe symptoms redirect to care.
+
+---
+
+## How label scan works
+
+Scan posts image data to `src/app/api/scan+api.ts`, which:
+
+1. Validates mime type and size
+2. Rate-limits per install id and per IP
+3. Calls Claude vision with the same server-side key
+4. Returns structured JSON only (`labelType`, medication fields, nutrition/sodium fields, `confidence`, `rawText`, `reason`)
+5. Does **not** log image bytes or `rawText`
+
+Then on device/browser:
+
+- Medication names are matched against the local SQLite cache
+- BP flags come only from curated `bp-flags.json`
+- Nutrition sodium can be logged to today’s local total
+
+---
+
+## Native phone setup (optional)
 
 Requires Node.js LTS.
 
 ```bash
 npm install
-cp .env.example .env   # then set ANTHROPIC_API_KEY
+cp .env.example .env   # set ANTHROPIC_API_KEY
 npx expo start
 ```
 
-`npx expo start` serves both the app and the API routes, so Ask AI and Scan
-work in development without a separate backend.
+`npx expo start` serves the app and API routes together.
 
-Because this project uses `expo-camera` and `expo-image-picker` with
-`expo-dev-client`, camera Scan needs a **dev build** (or a fresh native rebuild)
-rather than a stock Expo Go binary that predates those plugins:
+Because this project uses `expo-camera`, `expo-image-picker`, and `expo-dev-client`, camera Scan needs a **dev/native build**:
 
 ```bash
 npx expo run:ios
 # or
 npx expo run:android
-# or an EAS development build
+# or
+eas build --profile development -p ios
+eas build --profile preview -p android
 ```
 
-The repo ships with a pre-seeded cache (`src/data/drugs.json`, 200 common OTC
-and prescription drugs). Each record is tied to an RxNorm RxCUI and, when the
-label has them, brand names from OpenFDA. To refresh it from those databases:
+### Drug cache
+
+The repo ships `src/data/drugs.json` (200 common OTC + prescription drugs) with RxNorm RxCUIs and brand names when available.
 
 ```bash
-npm run seed
+npm run seed      # refresh from OpenFDA / RxNorm (Node)
+npm run seed:py   # same, Python
 ```
 
-`npm run seed:py` runs the same refresh with Python if Node is not on your PATH.
+The app imports JSON into on-device SQLite on first launch (and when the seed file changes).
 
-The app imports the JSON into the on-device SQLite database on first launch
-(and re-imports whenever the seed file changes).
+---
 
 ## Checks
 
 ```bash
 npm run lint
 npm run typecheck
-npm test          # unit tests: keyword matching, prompt context, ask/scan validation, drug match, bp flags, sodium math
-npm run test:ai   # live Anthropic boundary checks; needs ANTHROPIC_API_KEY
+npm test          # unit tests (ask/scan validation, drug match, bp flags, sodium math, …)
+npm run test:ai   # live Anthropic boundary checks (needs ANTHROPIC_API_KEY)
 ```
 
-`test:ai` exercises the live API with the app's exact system prompt and
-context injection, and checks that drug explanations stay grounded in cached
-data, mild symptoms get OTC categories plus a "see a doctor if…" note,
-specific dose/brand requests are refused, and severe symptoms are redirected
-to a doctor or urgent care. CI runs lint, typecheck, and unit tests on every
-push; `test:ai` runs only from a manual workflow trigger.
+CI runs lint, typecheck, and unit tests on every push. `test:ai` is manual-only.
 
-## Deploying and building
+---
 
-One-time setup:
+## Deploy / store builds
 
 ```bash
 npm install -g eas-cli
 eas login
-eas init                       # writes the project id into app.json
+eas init
 eas env:create --name ANTHROPIC_API_KEY --environment production --visibility secret
 eas env:create --name ANTHROPIC_API_KEY --environment preview --visibility secret
-npm run deploy:server          # first server deploy (export web + eas deploy)
-```
+npm run deploy:server
 
-Builds (the `preview` and `production` profiles set
-`EXPO_UNSTABLE_DEPLOY_SERVER=1`, so each build deploys and links its own
-server version):
-
-```bash
 eas build --profile preview -p android      # internal APK
-eas build --profile production -p ios       # App Store build
-eas submit -p ios                           # upload to TestFlight
+eas build --profile production -p ios       # App Store / TestFlight path
+eas submit -p ios
 ```
 
-The privacy policy is the `/privacy` route. After deploying, link
-`https://<your-deployment>.expo.app/privacy` in the store listings.
+After deploy, use `https://<your-deployment>.expo.app/privacy` in store listings.
 
-## Notes
+---
 
-- Drug data is informational only and not medical advice.
-- Blood-pressure flags and sodium references are educational prototypes.
-- Individual sodium and medication plans vary — follow clinician guidance.
+## Project layout (high level)
+
+```
+src/app/(tabs)/     Home, Ask AI, Scan, Search, Flashcards
+src/app/api/        ask+api.ts, scan+api.ts (server routes)
+src/data/           drugs.json, bp-flags.json
+src/db/             SQLite helpers (meds, sodium, usage)
+src/server/         Anthropic + request validation / rate limits
+tests/              Jest unit tests
+```
+
+---
+
+## Notes for demos
+
+1. Start with the **website demo** (`npm run demo:web`) if you cannot install on a phone yet.
+2. Have a clear medication label photo and a Nutrition Facts photo ready for Scan upload.
+3. Say clearly: prototype, local cache, curated BP flags, not clinical software.
+4. iOS native demos later need a Mac + Apple Developer account; Expo/React Native is the shared codebase for both platforms.
