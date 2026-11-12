@@ -17,6 +17,8 @@ import { ScanError, scanLabelImage } from '@/ai/scan-client';
 import { Colors, Spacing } from '@/constants/theme';
 import { setLatestScanResult } from '@/lib/scan-session';
 
+const IS_WEB = Platform.OS === 'web';
+
 export default function ScanScreen() {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
@@ -70,10 +72,12 @@ export default function ScanScreen() {
 
   async function pickFromLibrary() {
     if (busy) return;
-    const lib = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!lib.granted) {
-      setError('Photo library permission is needed to choose a label image.');
-      return;
+    if (!IS_WEB) {
+      const lib = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!lib.granted) {
+        setError('Photo library permission is needed to choose a label image.');
+        return;
+      }
     }
     const picked = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
@@ -92,6 +96,48 @@ export default function ScanScreen() {
         ? asset.mimeType
         : 'image/jpeg';
     await processBase64(base64, mime);
+  }
+
+  if (IS_WEB) {
+    return (
+      <View style={[styles.container, styles.webWrap, { backgroundColor: colors.background }]}>
+        <View style={[styles.webCard, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
+          <View style={[styles.webIcon, { backgroundColor: colors.tintSoft }]}>
+            <Ionicons name="cloud-upload-outline" size={32} color={colors.tint} />
+          </View>
+          <Text style={[styles.webTitle, { color: colors.text }]}>Scan a label (web demo)</Text>
+          <Text style={[styles.webBody, { color: colors.textSecondary }]}>
+            Upload a photo of a medication or Nutrition Facts label. Photos are processed in memory
+            and are not saved.
+          </Text>
+          <Text style={[styles.privacyInline, { color: colors.textSecondary }]}>
+            Avoid including a patient’s name or address in the image.
+          </Text>
+          <Pressable
+            onPress={pickFromLibrary}
+            disabled={busy}
+            accessibilityRole="button"
+            accessibilityLabel="Upload a label photo"
+            style={({ pressed }) => [
+              styles.primary,
+              { backgroundColor: colors.tint, opacity: pressed || busy ? 0.85 : 1 },
+            ]}>
+            {busy ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="image-outline" size={22} color="#fff" />
+                <Text style={styles.primaryText}>Upload label photo</Text>
+              </>
+            )}
+          </Pressable>
+          {busy ? (
+            <Text style={[styles.busyHint, { color: colors.textSecondary }]}>Reading label…</Text>
+          ) : null}
+          {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
+        </View>
+      </View>
+    );
   }
 
   if (!permission) {
@@ -188,7 +234,7 @@ export default function ScanScreen() {
             </Pressable>
 
             <View style={styles.libraryButton}>
-              <Text style={styles.libraryLabel}>{Platform.OS === 'web' ? 'Web' : ' '}</Text>
+              <Text style={styles.libraryLabel}> </Text>
             </View>
           </View>
           {busy ? (
@@ -204,6 +250,24 @@ export default function ScanScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  webWrap: { padding: Spacing.three, justifyContent: 'center' },
+  webCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: Spacing.four,
+    gap: Spacing.three,
+  },
+  webIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  webTitle: { fontSize: 26, fontWeight: '700' },
+  webBody: { fontSize: 16, lineHeight: 24 },
+  privacyInline: { fontSize: 14, lineHeight: 20 },
+  busyHint: { fontSize: 15, fontWeight: '600' },
   centered: { padding: Spacing.four, justifyContent: 'center', gap: Spacing.three },
   title: { fontSize: 28, fontWeight: '700' },
   body: { fontSize: 16, lineHeight: 24 },
@@ -213,6 +277,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: Spacing.four,
+    flexDirection: 'row',
+    gap: Spacing.two,
   },
   primaryText: { color: '#fff', fontSize: 18, fontWeight: '700' },
   secondary: {

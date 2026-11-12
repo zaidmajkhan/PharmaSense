@@ -73,6 +73,29 @@ log items into a local daily sodium total that resets by calendar date.
   of the frame when possible.
 - No analytics or tracking SDKs.
 
+## Website demo (no phone required)
+
+PharmaSense runs in the browser for demos and lab presentations:
+
+```bash
+npm install
+cp .env.example .env   # then set ANTHROPIC_API_KEY
+npm run demo:web
+```
+
+Open the local URL Expo prints (usually `http://localhost:8081`). On a laptop
+the site shows a phone-framed demo; on a narrow window it is full-width. Use
+**Scan → Upload label photo** on web (camera is for native builds).
+
+To publish a shareable link (after `eas login` and project setup):
+
+```bash
+npm run deploy:server
+```
+
+That exports the web app and deploys it with EAS Hosting (same path as Ask AI /
+Scan API hosting). Set `ANTHROPIC_API_KEY` in EAS env for the deployed demo.
+
 ## Setup
 
 Requires Node.js LTS.

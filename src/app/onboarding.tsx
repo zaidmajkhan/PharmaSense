@@ -29,8 +29,9 @@ export default function OnboardingScreen() {
           Before you start
         </Text>
         <Text style={[styles.lead, { color: colors.textSecondary }]}>
-          PharmaSense helps you look up and study common medicines. Please read how it should and
-          should not be used.
+          PharmaSense is a hypertension-focused prototype for looking up medicines, scanning labels,
+          and tracking a simple med list and sodium log. Please read how it should and should not be
+          used.
         </Text>
         <SafetyNotice />
         <Pressable onPress={() => router.push('/privacy')} style={styles.linkWrap}>
