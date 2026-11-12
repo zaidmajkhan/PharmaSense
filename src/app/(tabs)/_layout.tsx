@@ -16,7 +16,7 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: colors.backgroundElement,
           borderTopColor: colors.border,
-          height: Platform.OS === 'ios' ? 84 : 68,
+          height: Platform.OS === 'ios' ? 84 : Platform.OS === 'web' ? 72 : 68,
           paddingTop: 6,
           paddingBottom: Platform.OS === 'ios' ? 22 : 8,
         },
@@ -96,14 +96,14 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   scanWrap: {
-    top: -18,
+    top: Platform.OS === 'web' ? -10 : -18,
     justifyContent: 'center',
     alignItems: 'center',
     flex: 1,
   },
   scanFab: {
-    width: 64,
-    height: 64,
+    width: Platform.OS === 'web' ? 56 : 64,
+    height: Platform.OS === 'web' ? 56 : 64,
     borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',

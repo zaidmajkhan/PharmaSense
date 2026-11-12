@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { Platform } from 'react-native';
 
 import seedData from '@/data/drugs.json';
 import { extractKeywords } from '@/db/context-keywords';
@@ -7,6 +8,7 @@ import type { Drug, UsageType } from '@/types/drug';
 import type { MyMedication, SodiumLogEntry } from '@/types/scan';
 
 const db = SQLite.openDatabaseSync('pharmasense.db');
+const isWeb = Platform.OS === 'web';
 
 let databaseReady = true;
 let databaseInitError: string | null = null;
@@ -31,8 +33,9 @@ export function initDatabase(): void {
 }
 
 function initDatabaseTables(): void {
+  // WAL is preferred on native; web/wa-sqlite is happier with the default journal.
+  db.execSync(isWeb ? `PRAGMA journal_mode = DELETE;` : `PRAGMA journal_mode = WAL;`);
   db.execSync(`
-    PRAGMA journal_mode = WAL;
     CREATE TABLE IF NOT EXISTS drugs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,

@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { WebAppShell } from '@/components/web-app-shell';
 import { initDatabase } from '@/db/database';
 import { DisclaimerProvider, useDisclaimer } from '@/lib/disclaimer';
 
@@ -18,7 +19,9 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <DisclaimerProvider>
-          <RootStack />
+          <WebAppShell>
+            <RootStack />
+          </WebAppShell>
         </DisclaimerProvider>
       </ThemeProvider>
     </GestureHandlerRootView>

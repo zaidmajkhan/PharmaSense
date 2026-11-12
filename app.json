@@ -25,11 +25,25 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
+      "bundler": "metro",
       "output": "server",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "name": "PharmaSense",
+      "shortName": "PharmaSense",
+      "description": "Hypertension label-scan prototype — medication and nutrition labels, local med list, sodium watch. Not medical advice.",
+      "themeColor": "#1278B8",
+      "backgroundColor": "#F5F9FC"
     },
     "plugins": [
-      "expo-router",
+      [
+        "expo-router",
+        {
+          "headers": {
+            "Cross-Origin-Embedder-Policy": "credentialless",
+            "Cross-Origin-Opener-Policy": "same-origin"
+          }
+        }
+      ],
       [
         "expo-splash-screen",
         {
