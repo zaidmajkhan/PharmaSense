@@ -10,32 +10,36 @@ import {
   useColorScheme,
 } from 'react-native';
 
+import { SodiumProgressBars } from '@/components/sodium-progress';
 import { Colors, Fonts, Spacing } from '@/constants/theme';
 import {
-  getAiQueriesThisWeek,
   getDatabaseInitError,
   getDrugOfTheDay,
-  getFlashcardsReviewedCount,
+  getMyMedications,
+  getMyMedicationsCount,
   getRecentlyViewedDrugs,
+  getSodiumTotalForDate,
 } from '@/db/database';
 import type { Drug } from '@/types/drug';
+import type { MyMedication } from '@/types/scan';
 
 export default function HomeScreen() {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
 
   const [drugOfTheDay, setDrugOfTheDay] = useState<Drug | null>(null);
-  const [flashcardsReviewed, setFlashcardsReviewed] = useState(0);
-  const [aiQueriesThisWeek, setAiQueriesThisWeek] = useState(0);
   const [recentlyViewed, setRecentlyViewed] = useState<Drug[]>([]);
+  const [medCount, setMedCount] = useState(0);
+  const [medPreview, setMedPreview] = useState<MyMedication[]>([]);
+  const [sodiumToday, setSodiumToday] = useState(0);
 
-  // Re-query on focus so stats and recents stay fresh after using other tabs.
   useFocusEffect(
     useCallback(() => {
       setDrugOfTheDay(getDrugOfTheDay());
-      setFlashcardsReviewed(getFlashcardsReviewedCount());
-      setAiQueriesThisWeek(getAiQueriesThisWeek());
       setRecentlyViewed(getRecentlyViewedDrugs(5));
+      setMedCount(getMyMedicationsCount());
+      setMedPreview(getMyMedications().slice(0, 3));
+      setSodiumToday(getSodiumTotalForDate());
     }, [])
   );
 
@@ -44,16 +48,79 @@ export default function HomeScreen() {
   return (
     <ScrollView
       style={{ backgroundColor: colors.background }}
-      contentContainerStyle={styles.content}>
+      contentContainerStyle={styles.content}
+      accessibilityLabel="PharmaSense home">
       {initError ? (
-        <Text style={{ color: colors.warning, marginBottom: Spacing.three }}>{initError}</Text>
+        <Text style={{ color: colors.warning, marginBottom: Spacing.three, fontSize: 16 }}>
+          {initError}
+        </Text>
       ) : null}
-      {drugOfTheDay && (
+
+      <View style={[styles.hero, { backgroundColor: colors.hero, borderColor: colors.border }]}>
+        <Text style={[styles.brand, { color: colors.tint, fontFamily: Fonts?.rounded }]}>
+          PharmaSense
+        </Text>
+        <Text style={[styles.heroTitle, { color: colors.text, fontFamily: Fonts?.rounded }]}>
+          Blood pressure support, on your phone
+        </Text>
+        <Text style={[styles.heroBody, { color: colors.textSecondary }]}>
+          Scan medication and nutrition labels. Keep a simple med list and watch today’s sodium —
+          all on this device.
+        </Text>
+
+        <Pressable
+          onPress={() => router.push('/scan')}
+          accessibilityRole="button"
+          accessibilityLabel="Scan a label"
+          style={({ pressed }) => [
+            styles.scanButton,
+            { backgroundColor: colors.tint, opacity: pressed ? 0.88 : 1 },
+          ]}>
+          <Ionicons name="camera" size={24} color="#fff" />
+          <Text style={styles.scanButtonText}>Scan a label</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.summaryRow}>
+        <Pressable
+          onPress={() => router.push('/my-medications')}
+          accessibilityRole="button"
+          accessibilityLabel={`My medications, ${medCount} saved`}
+          style={({ pressed }) => [
+            styles.summaryCard,
+            { backgroundColor: colors.backgroundElement, opacity: pressed ? 0.9 : 1 },
+          ]}>
+          <View style={styles.summaryHeader}>
+            <Ionicons name="medkit-outline" size={22} color={colors.tint} />
+            <Text style={[styles.summaryTitle, { color: colors.text }]}>My medications</Text>
+          </View>
+          <Text style={[styles.summaryValue, { color: colors.text }]}>{medCount}</Text>
+          <Text style={[styles.summaryHint, { color: colors.textSecondary }]}>
+            {medCount === 0
+              ? 'Nothing saved yet. Scan a label or add from Search.'
+              : medPreview.map((m) => m.display_name).join(', ')}
+          </Text>
+        </Pressable>
+
+        <View
+          style={[styles.summaryCard, { backgroundColor: colors.backgroundElement }]}
+          accessibilityLabel="Sodium watch summary">
+          <View style={styles.summaryHeader}>
+            <Ionicons name="water-outline" size={22} color={colors.tint} />
+            <Text style={[styles.summaryTitle, { color: colors.text }]}>Sodium watch</Text>
+          </View>
+          <SodiumProgressBars sodiumMg={sodiumToday} colors={colors} compact />
+        </View>
+      </View>
+
+      {drugOfTheDay ? (
         <Pressable
           onPress={() => router.push(`/drug/${drugOfTheDay.id}`)}
+          accessibilityRole="button"
+          accessibilityLabel={`Drug of the day, ${drugOfTheDay.name}`}
           style={({ pressed }) => [
             styles.dotdCard,
-            { backgroundColor: colors.tintSoft, opacity: pressed ? 0.85 : 1 },
+            { backgroundColor: colors.tintSoft, opacity: pressed ? 0.9 : 1 },
           ]}>
           <Text style={[styles.dotdLabel, { color: colors.tint }]}>DRUG OF THE DAY</Text>
           <Text style={[styles.dotdName, { color: colors.text, fontFamily: Fonts?.rounded }]}>
@@ -62,42 +129,14 @@ export default function HomeScreen() {
           <Text style={[styles.dotdClass, { color: colors.textSecondary }]}>
             {drugOfTheDay.drug_class}
           </Text>
-          <Text style={[styles.dotdFact, { color: colors.text }]}>
-            {drugOfTheDay.notable_fact}
-          </Text>
+          <Text style={[styles.dotdFact, { color: colors.text }]}>{drugOfTheDay.notable_fact}</Text>
           <Text style={[styles.dotdTap, { color: colors.tint }]}>Tap for full details →</Text>
         </Pressable>
-      )}
-
-      <View style={styles.statsRow}>
-        <StatCard
-          icon="albums"
-          value={flashcardsReviewed}
-          label="Flashcards reviewed"
-          colors={colors}
-        />
-        <StatCard
-          icon="sparkles"
-          value={aiQueriesThisWeek}
-          label="AI queries this week"
-          colors={colors}
-        />
-      </View>
-
-      <View style={styles.shortcutsRow}>
-        <Shortcut icon="sparkles" label="Ask AI" onPress={() => router.push('/ask-ai')} colors={colors} />
-        <Shortcut icon="search" label="Search" onPress={() => router.push('/search')} colors={colors} />
-        <Shortcut
-          icon="albums"
-          label="Continue Flashcards"
-          onPress={() => router.push('/flashcards')}
-          colors={colors}
-        />
-      </View>
+      ) : null}
 
       <Text style={[styles.sectionTitle, { color: colors.text }]}>Recently viewed</Text>
       {recentlyViewed.length === 0 ? (
-        <Text style={{ color: colors.textSecondary }}>
+        <Text style={[styles.emptyRecent, { color: colors.textSecondary }]}>
           Drugs you open will show up here.
         </Text>
       ) : (
@@ -106,9 +145,11 @@ export default function HomeScreen() {
             <Pressable
               key={drug.id}
               onPress={() => router.push(`/drug/${drug.id}`)}
+              accessibilityRole="button"
+              accessibilityLabel={`${drug.name}, ${drug.drug_class}`}
               style={({ pressed }) => [
                 styles.recentCard,
-                { backgroundColor: colors.backgroundElement, opacity: pressed ? 0.85 : 1 },
+                { backgroundColor: colors.backgroundElement, opacity: pressed ? 0.9 : 1 },
               ]}>
               <Text style={[styles.recentName, { color: colors.text }]} numberOfLines={1}>
                 {drug.name}
@@ -124,98 +165,78 @@ export default function HomeScreen() {
       )}
 
       <Text style={[styles.disclaimer, { color: colors.textSecondary }]}>
-        Drug facts are cached from OpenFDA and RxNorm. Informational only — not medical advice.
+        Prototype only — not medical advice. Drug facts are cached from OpenFDA and RxNorm. Check
+        with your pharmacist or doctor before changing anything.
       </Text>
-      <Pressable onPress={() => router.push('/about')} style={styles.aboutLink}>
-        <Ionicons name="shield-checkmark-outline" size={16} color={colors.tint} />
+      <Pressable
+        onPress={() => router.push('/about')}
+        accessibilityRole="button"
+        accessibilityLabel="About and safety"
+        style={styles.aboutLink}>
+        <Ionicons name="shield-checkmark-outline" size={18} color={colors.tint} />
         <Text style={[styles.aboutText, { color: colors.tint }]}>About and safety</Text>
       </Pressable>
     </ScrollView>
   );
 }
 
-function StatCard({
-  icon,
-  value,
-  label,
-  colors,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  value: number;
-  label: string;
-  colors: (typeof Colors)['light'] | (typeof Colors)['dark'];
-}) {
-  return (
-    <View style={[styles.statCard, { backgroundColor: colors.backgroundElement }]}>
-      <Ionicons name={icon} size={18} color={colors.tint} />
-      <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
-      <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{label}</Text>
-    </View>
-  );
-}
-
-function Shortcut({
-  icon,
-  label,
-  onPress,
-  colors,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  onPress: () => void;
-  colors: (typeof Colors)['light'] | (typeof Colors)['dark'];
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.shortcut,
-        { backgroundColor: colors.backgroundElement, opacity: pressed ? 0.85 : 1 },
-      ]}>
-      <Ionicons name={icon} size={20} color={colors.tint} />
-      <Text style={[styles.shortcutLabel, { color: colors.text }]} numberOfLines={2}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   content: { padding: Spacing.three, paddingBottom: Spacing.six },
-  dotdCard: { borderRadius: 20, padding: Spacing.four },
+  hero: {
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: Spacing.four,
+    gap: Spacing.two,
+  },
+  brand: { fontSize: 15, fontWeight: '700', letterSpacing: 0.4 },
+  heroTitle: { fontSize: 28, fontWeight: '700', lineHeight: 34 },
+  heroBody: { fontSize: 16, lineHeight: 24 },
+  scanButton: {
+    marginTop: Spacing.two,
+    minHeight: 56,
+    borderRadius: 16,
+    paddingHorizontal: Spacing.four,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.two,
+  },
+  scanButtonText: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  summaryRow: { gap: Spacing.three, marginTop: Spacing.three },
+  summaryCard: { borderRadius: 20, padding: Spacing.three, gap: Spacing.two },
+  summaryHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  summaryTitle: { fontSize: 17, fontWeight: '700' },
+  summaryValue: { fontSize: 36, fontWeight: '700', lineHeight: 40 },
+  summaryHint: { fontSize: 15, lineHeight: 22 },
+  dotdCard: { borderRadius: 20, padding: Spacing.four, marginTop: Spacing.three },
   dotdLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 1.2 },
   dotdName: { fontSize: 26, fontWeight: '700', marginTop: Spacing.one },
-  dotdClass: { fontSize: 15, marginTop: 2 },
-  dotdFact: { fontSize: 15, lineHeight: 21, marginTop: Spacing.two },
-  dotdTap: { fontSize: 13, fontWeight: '600', marginTop: Spacing.two },
-  statsRow: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.three },
-  statCard: { flex: 1, borderRadius: 16, padding: Spacing.three, gap: 2 },
-  statValue: { fontSize: 24, fontWeight: '700' },
-  statLabel: { fontSize: 12 },
-  shortcutsRow: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.two },
-  shortcut: {
-    flex: 1,
-    borderRadius: 16,
-    padding: Spacing.three,
-    alignItems: 'center',
-    gap: Spacing.one,
-  },
-  shortcutLabel: { fontSize: 12, fontWeight: '600', textAlign: 'center' },
+  dotdClass: { fontSize: 16, marginTop: 2 },
+  dotdFact: { fontSize: 16, lineHeight: 24, marginTop: Spacing.two },
+  dotdTap: { fontSize: 15, fontWeight: '600', marginTop: Spacing.two },
   sectionTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '700',
     marginTop: Spacing.four,
     marginBottom: Spacing.two,
   },
+  emptyRecent: { fontSize: 16, lineHeight: 24 },
   recentCard: {
-    width: 140,
+    width: 150,
     borderRadius: 16,
     padding: Spacing.three,
     marginRight: Spacing.two,
+    minHeight: 88,
   },
-  recentName: { fontSize: 15, fontWeight: '600' },
-  recentClass: { fontSize: 12, marginTop: 2 },
-  disclaimer: { fontSize: 12, lineHeight: 18, marginTop: Spacing.four },
-  aboutLink: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one, marginTop: Spacing.two },
-  aboutText: { fontSize: 14, fontWeight: '600' },
+  recentName: { fontSize: 16, fontWeight: '600' },
+  recentClass: { fontSize: 14, marginTop: 4, lineHeight: 20 },
+  disclaimer: { fontSize: 14, lineHeight: 20, marginTop: Spacing.four },
+  aboutLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    marginTop: Spacing.two,
+    minHeight: 44,
+  },
+  aboutText: { fontSize: 16, fontWeight: '600' },
 });

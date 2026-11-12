@@ -1,14 +1,19 @@
 # PharmaSense
 
-A drug-reference and OTC-guidance app built with Expo (React Native). All drug
-data is cached locally in SQLite — seeded once from OpenFDA and RxNorm — and the
-app never calls those APIs during normal use.
+A hypertension-focused drug-reference and label-scan prototype built with Expo
+(React Native). Drug data is cached locally in SQLite — seeded once from OpenFDA
+and RxNorm — and the app never calls those APIs during normal use.
+
+**Not medical advice. Prototype only.** Check with your pharmacist or doctor
+before changing medications, diet, or treatment. Blood-pressure flags are a
+small curated list for education demos and must be reviewed by a licensed
+pharmacist before any real use.
 
 ## Tabs
 
-- **Home** — deterministic "Drug of the Day", quick stats (flashcards reviewed,
-  AI queries this week), shortcuts, recently viewed drugs, and an About and
-  safety page.
+- **Home** — hypertension dashboard with a prominent **Scan a label** button,
+  **My medications** and **Sodium watch** summaries, Drug of the Day, and
+  recently viewed drugs.
 - **Ask AI** — chat with Claude, grounded exclusively in the local drug cache.
   It explains cached drug info in plain language, or suggests general OTC drug
   *categories* (never brands, strengths, or doses) for mild symptoms. Dosing
@@ -16,14 +21,19 @@ app never calls those APIs during normal use.
   answer includes a "see a doctor if…" note, and severe symptoms get a
   doctor/urgent-care recommendation instead of an OTC suggestion. The thread
   is saved on the device and can be cleared from the header.
+- **Scan** — camera capture (or photo library fallback) of medication and
+  nutrition labels. Images are sent to the Expo API route
+  `src/app/api/scan+api.ts` for vision extraction. Photos are **not saved** on
+  the device or server; they are processed in memory and discarded after the
+  response. The scan screen reminds you: avoid including your name or address
+  in the frame.
 - **Search** — search the local cache by name, class, or brand; results open
-  the full drug screen.
+  the full drug screen (with **Add to My medications**).
 - **Flashcards** — swipeable flip cards (front: name + class; back: uses +
   side effects) that resume where you left off.
 
-All searches, views, flashcard reviews, and AI queries are logged to a local
-`usage` table that powers the Home-tab stats. New installs see a one-time
-safety acknowledgment before the tabs.
+Related stack screens: **Scan result**, **My medications**, About/safety, and
+Privacy.
 
 ## How Ask AI reaches Claude
 
@@ -38,6 +48,31 @@ The app never holds an Anthropic key. Ask AI posts to the Expo API route
   modified client cannot inject made-up "cached" drug text,
 - calls Anthropic with the server-side `ANTHROPIC_API_KEY`.
 
+## How label scan works
+
+Scan posts base64 image data to `src/app/api/scan+api.ts`, which:
+
+- validates mime type and payload size,
+- rate-limits per install id and per IP,
+- calls Claude with vision using the same server-side `ANTHROPIC_API_KEY`,
+- returns structured JSON only (`labelType`, medication fields, nutrition /
+  sodium fields, `confidence`, `rawText`, `reason`),
+- does **not** log image data or `rawText`.
+
+Medication results are matched against the on-device SQLite drug cache. Curated
+blood-pressure relevance flags come from `src/data/bp-flags.json` only — never
+from freeform model text. Nutrition results compare sodium per serving to
+2,300 mg (common daily limit) and 1,500 mg (ideal limit) references; you can
+log items into a local daily sodium total that resets by calendar date.
+
+## Privacy
+
+- No accounts and no cloud sync for medications or sodium logs.
+- Scan images are not stored; process in memory only.
+- Prescription labels can contain a patient’s name and address — keep those out
+  of the frame when possible.
+- No analytics or tracking SDKs.
+
 ## Setup
 
 Requires Node.js LTS.
@@ -48,8 +83,19 @@ cp .env.example .env   # then set ANTHROPIC_API_KEY
 npx expo start
 ```
 
-`npx expo start` serves both the app and the API route, so Ask AI works in
-development without a separate backend.
+`npx expo start` serves both the app and the API routes, so Ask AI and Scan
+work in development without a separate backend.
+
+Because this project uses `expo-camera` and `expo-image-picker` with
+`expo-dev-client`, camera Scan needs a **dev build** (or a fresh native rebuild)
+rather than a stock Expo Go binary that predates those plugins:
+
+```bash
+npx expo run:ios
+# or
+npx expo run:android
+# or an EAS development build
+```
 
 The repo ships with a pre-seeded cache (`src/data/drugs.json`, 200 common OTC
 and prescription drugs). Each record is tied to an RxNorm RxCUI and, when the
@@ -69,7 +115,7 @@ The app imports the JSON into the on-device SQLite database on first launch
 ```bash
 npm run lint
 npm run typecheck
-npm test          # unit tests: keyword matching, prompt context, request validation
+npm test          # unit tests: keyword matching, prompt context, ask/scan validation, drug match, bp flags, sodium math
 npm run test:ai   # live Anthropic boundary checks; needs ANTHROPIC_API_KEY
 ```
 
@@ -109,3 +155,5 @@ The privacy policy is the `/privacy` route. After deploying, link
 ## Notes
 
 - Drug data is informational only and not medical advice.
+- Blood-pressure flags and sodium references are educational prototypes.
+- Individual sodium and medication plans vary — follow clinician guidance.

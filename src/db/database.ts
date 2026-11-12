@@ -2,7 +2,9 @@ import * as SQLite from 'expo-sqlite';
 
 import seedData from '@/data/drugs.json';
 import { extractKeywords } from '@/db/context-keywords';
+import { localDateKey } from '@/lib/sodium';
 import type { Drug, UsageType } from '@/types/drug';
+import type { MyMedication, SodiumLogEntry } from '@/types/scan';
 
 const db = SQLite.openDatabaseSync('pharmasense.db');
 
@@ -52,8 +54,29 @@ function initDatabaseTables(): void {
       FOREIGN KEY (drug_id) REFERENCES drugs (id)
     );
     CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS my_medications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      drug_id INTEGER,
+      display_name TEXT NOT NULL,
+      strength TEXT,
+      form TEXT,
+      directions TEXT,
+      source TEXT NOT NULL CHECK (source IN ('scan', 'search')),
+      added_at INTEGER NOT NULL,
+      FOREIGN KEY (drug_id) REFERENCES drugs (id)
+    );
+    CREATE TABLE IF NOT EXISTS sodium_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      logged_date TEXT NOT NULL,
+      product_name TEXT,
+      serving_size TEXT,
+      sodium_mg REAL NOT NULL,
+      created_at INTEGER NOT NULL
+    );
     CREATE INDEX IF NOT EXISTS idx_usage_type_time ON usage (type, timestamp DESC);
     CREATE INDEX IF NOT EXISTS idx_drugs_name ON drugs (name);
+    CREATE INDEX IF NOT EXISTS idx_my_meds_added ON my_medications (added_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_sodium_log_date ON sodium_log (logged_date);
   `);
 
   // Databases created before RxNorm ids and brand names were stored.
@@ -248,4 +271,107 @@ export function getAiQueriesThisWeek(): number {
       [weekAgo]
     )?.n ?? 0
   );
+}
+
+// ---------- my medications ----------
+
+export function getMyMedications(): MyMedication[] {
+  if (!databaseReady) return [];
+  return db.getAllSync<MyMedication>(
+    `SELECT * FROM my_medications ORDER BY added_at DESC`
+  );
+}
+
+export function getMyMedicationsCount(): number {
+  if (!databaseReady) return 0;
+  return db.getFirstSync<{ n: number }>(`SELECT COUNT(*) AS n FROM my_medications`)?.n ?? 0;
+}
+
+export function addMyMedication(input: {
+  drugId: number | null;
+  displayName: string;
+  strength?: string | null;
+  form?: string | null;
+  directions?: string | null;
+  source: 'scan' | 'search';
+}): number | null {
+  if (!databaseReady) return null;
+  const name = input.displayName.trim();
+  if (!name) return null;
+  const result = db.runSync(
+    `INSERT INTO my_medications (drug_id, display_name, strength, form, directions, source, added_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      input.drugId,
+      name,
+      input.strength?.trim() || null,
+      input.form?.trim() || null,
+      input.directions?.trim() || null,
+      input.source,
+      Date.now(),
+    ]
+  );
+  return result.lastInsertRowId;
+}
+
+export function removeMyMedication(id: number): void {
+  if (!databaseReady) return;
+  db.runSync(`DELETE FROM my_medications WHERE id = ?`, [id]);
+}
+
+export function isDrugInMyMedications(drugId: number): boolean {
+  if (!databaseReady) return false;
+  return (
+    (db.getFirstSync<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM my_medications WHERE drug_id = ?`,
+      [drugId]
+    )?.n ?? 0) > 0
+  );
+}
+
+// ---------- sodium log ----------
+
+export function getSodiumTotalForDate(dateKey: string = localDateKey()): number {
+  if (!databaseReady) return 0;
+  return (
+    db.getFirstSync<{ total: number | null }>(
+      `SELECT SUM(sodium_mg) AS total FROM sodium_log WHERE logged_date = ?`,
+      [dateKey]
+    )?.total ?? 0
+  );
+}
+
+export function getSodiumLogForDate(dateKey: string = localDateKey()): SodiumLogEntry[] {
+  if (!databaseReady) return [];
+  return db.getAllSync<SodiumLogEntry>(
+    `SELECT * FROM sodium_log WHERE logged_date = ? ORDER BY created_at DESC`,
+    [dateKey]
+  );
+}
+
+export function addSodiumLogEntry(input: {
+  productName?: string | null;
+  servingSize?: string | null;
+  sodiumMg: number;
+  dateKey?: string;
+}): number | null {
+  if (!databaseReady) return null;
+  if (!Number.isFinite(input.sodiumMg) || input.sodiumMg < 0) return null;
+  const result = db.runSync(
+    `INSERT INTO sodium_log (logged_date, product_name, serving_size, sodium_mg, created_at)
+     VALUES (?, ?, ?, ?, ?)`,
+    [
+      input.dateKey ?? localDateKey(),
+      input.productName?.trim() || null,
+      input.servingSize?.trim() || null,
+      input.sodiumMg,
+      Date.now(),
+    ]
+  );
+  return result.lastInsertRowId;
+}
+
+export function removeSodiumLogEntry(id: number): void {
+  if (!databaseReady) return;
+  db.runSync(`DELETE FROM sodium_log WHERE id = ?`, [id]);
 }
