@@ -1,6 +1,6 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * PharmaSense visual system — calm clinical azure (light-first).
+ * Inspired by soft health-product UIs: high-key backgrounds, cool accent, generous space.
  */
 
 import '@/global.css';
@@ -9,28 +9,34 @@ import { Platform } from 'react-native';
 
 export const Colors = {
   light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
-    tint: '#0E7AFD',
-    tintSoft: '#E3EFFF',
+    text: '#0A1B2A',
+    background: '#F5F9FC',
+    backgroundElement: '#FFFFFF',
+    backgroundSelected: '#E4EEF6',
+    textSecondary: '#5A6B7A',
+    tint: '#1278B8',
+    tintSoft: '#DCECFA',
     success: '#1B9E4B',
-    warning: '#C2410C',
-    border: '#E4E4E9',
+    warning: '#B45309',
+    danger: '#B42318',
+    border: '#D3E0EA',
+    hero: '#E3F1FA',
+    heroAccent: '#C5E3F5',
   },
   dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
-    tint: '#4C9FFF',
-    tintSoft: '#0F2A4A',
+    text: '#F4F8FB',
+    background: '#0A1218',
+    backgroundElement: '#142029',
+    backgroundSelected: '#1E2C38',
+    textSecondary: '#A8B6C2',
+    tint: '#5CB8D6',
+    tintSoft: '#123040',
     success: '#34C759',
     warning: '#FF9F0A',
-    border: '#2E3135',
+    danger: '#FF6B6B',
+    border: '#2A3A48',
+    hero: '#102029',
+    heroAccent: '#163242',
   },
 } as const;
 

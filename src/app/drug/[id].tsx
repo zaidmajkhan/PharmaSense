@@ -1,25 +1,50 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useColorScheme,
+} from 'react-native';
 
+import { BpFlagCard } from '@/components/bp-flag-card';
 import { Colors, Fonts, Spacing } from '@/constants/theme';
-import { getDrugById, logUsage } from '@/db/database';
+import { matchBpFlags } from '@/lib/bp-flags';
+import {
+  addMyMedication,
+  getDrugById,
+  isDrugInMyMedications,
+  logUsage,
+} from '@/db/database';
 
 export default function DrugDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
+  const [saved, setSaved] = useState(false);
 
   const drug = useMemo(() => getDrugById(Number(id)), [id]);
+  const flags = useMemo(
+    () => (drug ? matchBpFlags([drug.name, drug.brand_names, drug.drug_class]) : []),
+    [drug]
+  );
 
   useEffect(() => {
     if (drug) logUsage('view', drug.id);
   }, [drug]);
 
+  useFocusEffect(
+    useCallback(() => {
+      if (drug) setSaved(isDrugInMyMedications(drug.id));
+    }, [drug])
+  );
+
   if (!drug) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <Text style={{ color: colors.textSecondary }}>Drug not found.</Text>
+        <Text style={{ color: colors.textSecondary, fontSize: 16 }}>Drug not found.</Text>
       </View>
     );
   }
@@ -55,6 +80,37 @@ export default function DrugDetailScreen() {
         </Text>
       </View>
 
+      <Pressable
+        onPress={() => {
+          if (saved) return;
+          addMyMedication({
+            drugId: drug.id,
+            displayName: drug.name,
+            source: 'search',
+          });
+          setSaved(true);
+        }}
+        disabled={saved}
+        accessibilityRole="button"
+        accessibilityLabel={saved ? 'Already in my medications' : 'Add to my medications'}
+        style={({ pressed }) => [
+          styles.addButton,
+          {
+            backgroundColor: saved ? colors.success : colors.tint,
+            opacity: pressed ? 0.88 : 1,
+          },
+        ]}>
+        <Text style={styles.addButtonText}>
+          {saved ? 'In My medications' : 'Add to My medications'}
+        </Text>
+      </Pressable>
+
+      {flags.map((flag) => (
+        <View key={flag.id} style={{ marginTop: Spacing.two }}>
+          <BpFlagCard flag={flag} colors={colors} />
+        </View>
+      ))}
+
       <Section title="Notable fact" body={drug.notable_fact} colors={colors} />
       <Section title="Uses" body={drug.uses} colors={colors} />
       <Section title="Label dosing" body={drug.dosing} colors={colors} />
@@ -63,8 +119,8 @@ export default function DrugDetailScreen() {
 
       <Text style={[styles.disclaimer, { color: colors.textSecondary }]}>
         Uses, dosing, side effects, and interactions are copied from OpenFDA drug labels and
-        classified with RxNorm. The dosing section is label text, not a dose for you. Informational
-        only — not medical advice.
+        classified with RxNorm. The dosing section is label text, not a dose for you. Check with
+        your pharmacist or doctor before changing anything. Informational only — not medical advice.
       </Text>
     </ScrollView>
   );
@@ -101,6 +157,14 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
   badgeText: { fontSize: 13, fontWeight: '600' },
+  addButton: {
+    minHeight: 52,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.one,
+  },
+  addButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   section: {
     borderRadius: 16,
     padding: Spacing.three,
@@ -113,6 +177,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     marginBottom: Spacing.one,
   },
-  sectionBody: { fontSize: 15, lineHeight: 22 },
-  disclaimer: { fontSize: 12, marginTop: Spacing.three, textAlign: 'center' },
+  sectionBody: { fontSize: 16, lineHeight: 24 },
+  disclaimer: { fontSize: 14, lineHeight: 20, marginTop: Spacing.three, textAlign: 'center' },
 });

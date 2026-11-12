@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "disclaimer": "Curated educational flags only. Not medical advice. Individual responses vary.",
+  "entries": [
+    {
+      "id": "pseudoephedrine",
+      "matchTerms": ["pseudoephedrine", "sudafed"],
+      "direction": "raise",
+      "note": "Pseudoephedrine is a decongestant that can raise blood pressure in some people.",
+      "pharmacistLine": "Talk to your pharmacist before using this if you have high blood pressure."
+    },
+    {
+      "id": "phenylephrine",
+      "matchTerms": ["phenylephrine"],
+      "direction": "raise",
+      "note": "Phenylephrine is a decongestant that may raise blood pressure in some people.",
+      "pharmacistLine": "Talk to your pharmacist before using this if you have high blood pressure."
+    },
+    {
+      "id": "ibuprofen",
+      "matchTerms": ["ibuprofen", "advil", "motrin"],
+      "direction": "raise",
+      "note": "Ibuprofen is an NSAID that can raise blood pressure and affect kidney function with regular use.",
+      "pharmacistLine": "Talk to your pharmacist about pain options that fit your blood pressure plan."
+    },
+    {
+      "id": "naproxen",
+      "matchTerms": ["naproxen", "aleve"],
+      "direction": "raise",
+      "note": "Naproxen is an NSAID that can raise blood pressure and affect kidney function with regular use.",
+      "pharmacistLine": "Talk to your pharmacist about pain options that fit your blood pressure plan."
+    },
+    {
+      "id": "high-sodium-effervescent",
+      "matchTerms": ["effervescent", "sodium bicarbonate", "alka-seltzer"],
+      "direction": "raise",
+      "note": "Some effervescent tablets and antacids are high in sodium, which can raise blood pressure when used often.",
+      "pharmacistLine": "Ask your pharmacist to check the sodium content before regular use."
+    }
+  ]
+}

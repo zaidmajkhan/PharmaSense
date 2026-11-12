@@ -39,6 +39,8 @@ function RootStack() {
       <Stack.Protected guard={accepted}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="drug/[id]" options={{ title: 'Drug Details' }} />
+        <Stack.Screen name="scan-result" options={{ title: 'Scan result' }} />
+        <Stack.Screen name="my-medications" options={{ title: 'My medications' }} />
         <Stack.Screen name="about" options={{ title: 'About and safety' }} />
       </Stack.Protected>
       <Stack.Protected guard={!accepted}>
